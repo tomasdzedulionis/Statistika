@@ -11,7 +11,13 @@ data<- read.csv(tf, sep = ",", header=TRUE)
 ## Darbo stažas įmonėje(intervalinis), Bruto atlyginimas(Intervalinis). įmonės dydis(kategorinis)
 data <- select(data, B21, B25, A14, B26, B42, A12)
 colnames(data) <- c("lytis", "issilavinimas", "sektorius", "stazas", "bruto", "imonesdydis")
-data <- filter(data, bruto>=100) ## Nezinau ar reikia, taciau logiskiau gaunasi (BENT 0.25 etato)
+
+######################
+#PAGALVOT AR TINKA ?!!!!!
+data <- filter(data, bruto>=100 & bruto <=10000) ## Nezinau ar reikia, taciau logiskiau gaunasi (BENT 0.25 etato)
+
+###################################
+
 data$lytis <- factor(data$lytis)
 data$issilavinimas <- factor (data$issilavinimas)
 data$sektorius <- factor (data$sektorius)
@@ -79,6 +85,8 @@ describe(dat,na.rm=T)
 
 ## Pjuvis 
 
+nrow(data[data$bruto > 10000,])
+
 dat1 <- select(data, lytis, bruto, stazas)
 dat1 %>% group_by(lytis)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
 
@@ -106,7 +114,7 @@ ggplot(dat1, aes(x=bruto, group=lytis, color=lytis)) +
         labs(x="Bruto atlyginimas",y="Dažnis",group="Lytis",color="Lytis")+
         ggtitle("Bruto atlyginimo pagal lyti histograma")+
         theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
-        scale_x_continuous(breaks = seq(min(dat1$bruto), max(dat1$bruto), by = 2500))
+        scale_x_continuous(breaks = seq(min(dat1$bruto), max(dat1$bruto), by = 500))
 
 
 ###Bruto pagal issilavinima
