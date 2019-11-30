@@ -145,9 +145,25 @@ ggplot(dat1, aes(x=as.numeric(stazas), group=lytis, color=lytis)) +
         labs(x="Darbo stazas",y="Dažnis",group="Lytis",color="Lytis")+
         ggtitle("Darbo stazo pagal lyti histograma")+
         theme(axis.text.x = element_text(face="bold",  size=8, angle=90))
+### T testas
+t.test(data$bruto ~ data$sektorius)
 
+### 6 uzduotis
+rez<-summarise(data,vid=mean(bruto), std=sd(bruto),disp=var(bruto)) 
+error <- qt(0.975,df=length(data$bruto)-1)*sd(data$bruto)/sqrt(length(data$bruto)) 
+left <- mean(data$bruto)-error
+right <- mean(data$bruto)+error
+left
+right
 
+### 7 uzduotis.
+observations <- matrix(rnorm(50000, mean=rez$vid, sd=rez$std), 100, 500) # panaudojam apskaičiuotas charakteristikas
+means<- apply(observations,1,mean)
+variance<-apply(observations,1,var)
+deviation<-apply(observations,1,sd) # papildovai std nuokrypis
 
-
-
-
+hist(means)
+ggplot(as.data.frame(means),aes(x="",y=means))+
+        geom_boxplot()+
+        ylab("Vidurkiai")+
+        ggtitle("Stačiakampė diagrama")
