@@ -26,7 +26,8 @@ mean_median_income <- filter(mean_median_income,
                              time>="2007-01-01",
                              geo=="FR",
                              unit=="EUR",
-                             age=="Y16-64")
+                             age=="Y16-64",
+                             sex=="T")
 
 
 Data <- right_join(unemployment, BVP_crrntmrktprice, by="time")
@@ -90,8 +91,8 @@ ggplot(Data, aes(x = time)) +
         scale_y_continuous(sec.axis = sec_axis(~.*0.01, name = "Pajamų vidurkis (tūkst.eur)")) + 
         labs(y = "BVP [mln. eur.]", x = "Metai",
              colour = "Parametrai", subtitle="Šaltinis:Eurostat[ilc_di13]") + 
-             theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
-             theme(legend.position="bottom")+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        theme(legend.position="bottom")+
         scale_x_continuous(breaks = seq(min(Data$time), max(Data$time), by = 1))+
         ggtitle("BVP ir vyrų vidutinių pajamų kitimas 2007-2018m.")
 
@@ -129,7 +130,8 @@ ggplot(DF, aes(time, bvp)) +
         scale_x_continuous(breaks=DF$time,labels=DF$time)+
         geom_line(stat="identity") +
         geom_point(size=1) +
-        stat_smooth(method = "lm", se = FALSE)
+        stat_smooth(method = "lm", se = FALSE)+
+        labs(x="Metai", y="BVP")
 
 ggplotRegression <- function(fit,df){
         
@@ -174,5 +176,12 @@ summary(regr3)
 ggplotRegression(regr3,DF)
 
 ## prognoze meanincome nuo BVP
-new.time <- data.frame(Metai = c(DF$time, 2018:2020))
+
+new.time <- data.frame(time = c(Data$time, 2018:2020))
 new.bvp <- data.frame(bvp=predict(trnd, new.time, se.fit=TRUE)$fit)
+
+
+
+
+
+
