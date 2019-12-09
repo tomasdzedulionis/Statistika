@@ -1,169 +1,176 @@
+##1-a uzduotis.
 if(!require(tidyverse)) install.packages("tidyverse")
 require(tidyverse)
 if(!require(httr)) install.packages("httr")
 require(httr)
 if(!require(psych)) install.packages("psych")
 require(psych)
-url<-"https://drive.google.com/uc?export=download&id=1S5K0ii6_5bUlPUzGbmw0E-Y0N2rUXs_W"
+url<-"https://drive.google.com/uc?export=download&id=12PNPliiWwR8L1u8s-Q02kvtzg5YyUjND"
 GET(url, write_disk(tf <- tempfile(fileext = ".csv")))
-data<- read.csv(tf, sep = ",", header=TRUE)
-## Kintamieji: Lytis(kategorinis), Išsilavinimas(kategorinis), Sektorius(kategorinis),
-## Darbo stažas įmonėje(intervalinis), Bruto atlyginimas(Intervalinis). įmonės dydis(kategorinis)
-data <- select(data, B21, B25, A14, B26, B42, A12)
-colnames(data) <- c("lytis", "issilavinimas", "sektorius", "stazas", "bruto", "imonesdydis")
+data<- read.csv(tf, sep = ";", header=TRUE)
+data <- select(data, HH070, HS040, HS060, HS120, HY010, M_K)
+colnames(data) <- c("BustoIslaikymoIslaidos", "GalimybeAtostogauti", "GalimybeApmoketiIslaidas", "KaipVerciasi", "Pajamos", "M_K")
+levels(data$M_K) <- c(levels(data$M_K), "Miestas", "Kaimas") 
+data$M_K[data$M_K=="1"]  <- "Miestas"
+data$M_K[data$M_K=="2"]  <- "Kaimas"
+levels(data$GalimybeAtostogauti) <- c(levels(data$GalimybeAtostogauti), "Taip", "Ne")
+data$GalimybeAtostogauti[data$GalimybeAtostogauti=="1"] <- "Taip"
+data$GalimybeAtostogauti[data$GalimybeAtostogauti=="2"] <- "Ne"
+data$GalimybeAtostogauti <- factor(data$GalimybeAtostogauti)
+data$GalimybeApmoketiIslaidas <- factor (data$GalimybeApmoketiIslaidas)
+data$KaipVerciasi <- factor (data$KaipVerciasi)
+data$M_K <- factor (data$M_K)
+data<-na.omit(data)
+data$BustoIslaikymoIslaidos <- as.numeric(sub(",", ".", data$BustoIslaikymoIslaidos, fixed=T))
+data$Pajamos <- as.numeric(sub(",", ".", data$Pajamos, fixed=T))
 
-######################
-#PAGALVOT AR TINKA ?!!!!!
-data <- filter(data, bruto>=100 & bruto <=10000) ## Nezinau ar reikia, taciau logiskiau gaunasi (BENT 0.25 etato)
+##3-ia uzduotis
 
-###################################
+#a) Dazniai ir santykiniai dazniai
 
-data$lytis <- factor(data$lytis)
-data$issilavinimas <- factor (data$issilavinimas)
-data$sektorius <- factor (data$sektorius)
-data$imonesdydis <- factor (data$imonesdydis)
+table(data$GalimybeAtostogauti)
+prop.table(table(data$GalimybeAtostogauti))
+round(prop.table(table(data$GalimybeAtostogauti))*100, 2)
 
-## Dazniai ir santykiniai dazniai
+table(data$GalimybeApmoketiIslaidas)
+prop.table(table(data$GalimybeApmoketiIslaidas))
+round(prop.table(table(data$GalimybeApmoketiIslaidas))*100, 2)
 
-table(data$lytis)
-prop.table(table(data$lytis))
-round(prop.table(table(data$lytis))*100, 2)
+table(data$KaipVerciasi)
+prop.table(table(data$KaipVerciasi))
+round(prop.table(table(data$KaipVerciasi))*100, 2)
 
-table(data$issilavinimas)
-prop.table(table(data$issilavinimas))
-round(prop.table(table(data$issilavinimas))*100, 2)
+table(data$M_K)
+prop.table(table(data$M_K))
+round(prop.table(table(data$M_K))*100, 2)
 
-table(data$sektorius)
-prop.table(table(data$sektorius))
-round(prop.table(table(data$sektorius))*100, 2)
+# Stulpeliu diagramos
 
-table(data$imonesdydis)
-prop.table(table(data$imonesdydis))
-round(prop.table(table(data$imonesdydis))*100, 2)
-
-## Grafikai kategoriniu
-
-LytisGrafikas <- ggplot(data, aes(lytis)) + 
+ggplot(data, aes(GalimybeAtostogauti)) + 
         geom_bar(aes(y = (..count..)/sum(..count..))) + 
         scale_y_continuous(labels=scales::percent) +
-        labs(x="Lytis",y="Procentai")+
-        ggtitle("Lytis (procentai)")+
-        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))
-LytisGrafikas
-
-
-IssilavinimasGrafikas <- ggplot(data, aes(issilavinimas)) + 
+        labs(x="Galimybe karta per metus atostogauti",y="Procentai")+
+        ggtitle("Galimybe karta per metus atostogauti proc.")
+ggplot(data, aes(GalimybeApmoketiIslaidas)) + 
         geom_bar(aes(y = (..count..)/sum(..count..))) + 
         scale_y_continuous(labels=scales::percent) +
-        labs(x="Issilavinimas",y="Procentai")+
-        ggtitle("Issilavinimas (procentai)")+
-        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))
-IssilavinimasGrafikas
-
-SektoriusGrafikas <- ggplot(data, aes(sektorius)) + 
+        labs(x="Galimybe apmoketi islaidas",y="Procentai")+
+        ggtitle("Galimybe apmoketi nenumatytas 700lt islaidas proc. (1-Taip, 2-Ne)")
+ggplot(data, aes(KaipVerciasi)) + 
         geom_bar(aes(y = (..count..)/sum(..count..))) + 
         scale_y_continuous(labels=scales::percent) +
-        labs(x="Sektorius",y="Procentai")+
-        ggtitle("Sektorius (procentai)")+
-        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))
-SektoriusGrafikas
-
-ImonesdydisGrafikas <- ggplot(data, aes(imonesdydis)) + 
+        labs(x="Kaip namu ukis verciasi",y="Procentai")+
+        ggtitle("Kaip verciasi namu ukis? (1-labai sunkiai...6-labai lengvai)")
+ggplot(data, aes(M_K)) + 
         geom_bar(aes(y = (..count..)/sum(..count..))) + 
         scale_y_continuous(labels=scales::percent) +
-        labs(x="Imones Dydis",y="Procentai")+
-        ggtitle("Imones dydis (procentai)")+
-        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))
-ImonesdydisGrafikas
+        labs(x="Vietove",y="Procentai")+
+        ggtitle("Vietoves pasiskirstymas proc.")
 
+
+###b) Intervaliniams kintamiesiems apskaičiuokite padėties, 
+##    sklaidos bei formos skaitines charakteristikas pagal kategorinio kintamojo(-ųjų) pjūvį(-ius).
 ## Charakteristikos
 
-dat<-select(data,stazas,bruto)
+dat<-select(data,BustoIslaikymoIslaidos,Pajamos)
 summary(dat)
 summarise_all(dat,list(StdNuok = sd, Dispersija = var, MAD = mad),na.rm=T)
 describe(dat,na.rm=T)
 
 ## Pjuvis 
+dat<-select(data,BustoIslaikymoIslaidos,Pajamos)
+summary(dat)
+summarise_all(dat,list(StdNuok = sd, Dispersija = var, MAD = mad),na.rm=T)
+describe(dat,na.rm=T)
+dat1 <- select(data, GalimybeAtostogauti, BustoIslaikymoIslaidos, Pajamos)
+dat1 %>% group_by(GalimybeAtostogauti)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+dat2 <- select(data, GalimybeApmoketiIslaidas, BustoIslaikymoIslaidos, Pajamos)
+dat2 %>% group_by(GalimybeApmoketiIslaidas)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+dat3 <- select(data, KaipVerciasi, BustoIslaikymoIslaidos, Pajamos)
+dat3 %>% group_by(KaipVerciasi)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+dat4 <- select(data, M_K, BustoIslaikymoIslaidos, Pajamos)
+dat4 %>% group_by(M_K)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
 
-nrow(data[data$bruto > 10000,])
+##c) Išbrėžkite pasirinktų rodiklių 
+##stačiakampę diagramą bei histogramą pagal kategorinio kintamojo(-ųjų) pjūvį(-ius). 
 
-dat1 <- select(data, lytis, bruto, stazas)
-dat1 %>% group_by(lytis)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
-
-dat2 <- select(data, issilavinimas, bruto, stazas)
-dat2 %>% group_by(issilavinimas)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
-
-dat3 <- select(data, sektorius, bruto, stazas)
-dat3 %>% group_by(sektorius)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
-
-dat4 <- select(data, imonesdydis, bruto, stazas)
-dat4 %>% group_by(imonesdydis)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
-
-## Staciakampes diagramos ir histogramos
-### Bruto pagal lyti
-a <- ggplot(data, aes(x=lytis, y=bruto,color=as.factor(lytis))) +
-        labs(x="Lytis",y="Bruto atlyginimas",color="Atlyginimas")+
-        geom_boxplot()+ggtitle("Bruto atlyginimo pagal lytitačiakampė diagrama")+
-        scale_x_discrete(labels = c('Moterys','Vyrai'))+
-        scale_y_continuous(breaks = seq(0, max(data$bruto), by = 2000))
-a
-
-levels(dat1$lytis)<-c("Moteris","Vyras")
-ggplot(dat1, aes(x=bruto, group=lytis, color=lytis)) +
-        geom_histogram(fill="white",binwidth=500, alpha=0.5, position="identity")+
-        labs(x="Bruto atlyginimas",y="Dažnis",group="Lytis",color="Lytis")+
-        ggtitle("Bruto atlyginimo pagal lyti histograma")+
+ggplot(data, aes(x=M_K, y=Pajamos,color=as.factor(M_K))) +
+        labs(x="Vietove",y="Namu ukio pajamos",color="Pajamos")+
+        geom_boxplot()+ggtitle("Namu ukio pajamu pagal vietove staciakampe diagrama")+
+        scale_y_continuous(breaks = seq(0, max(data$Pajamos), by = 10000))
+ggplot(dat4, aes(x=Pajamos, group=M_K, color=M_K)) +
+        geom_histogram(fill="white",binwidth=10000, alpha=0.5, position="identity")+
+        labs(x="Namu ukio pajamos",y="Dažnis",group="M_K",color="M_K")+
+        ggtitle("Namu ukio pajamu pagal vietove histograma")+
         theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
-        scale_x_continuous(breaks = seq(min(dat1$bruto), max(dat1$bruto), by = 500))
-
-
-###Bruto pagal issilavinima
-b <- ggplot(data, aes(x=issilavinimas, y=bruto,color=as.factor(issilavinimas))) +
-        labs(x="Issilavinimas",y="Bruto atlyginimas",color="Issilavinimas")+
-        geom_boxplot()+ggtitle("Bruto atlyginimo pagal issilavinima Stačiakampė diagrama")+
-        scale_y_continuous(breaks = seq(0, max(data$bruto), by = 2000))
-b
-
-ggplot(dat2, aes(x=bruto, group=issilavinimas, color=issilavinimas)) +
-        geom_histogram(fill="white",binwidth=500, alpha=0.5, position="identity")+
-        labs(x="Bruto atlyginimas",y="Dažnis",group="Issilavinimas",color="Issilavinimas")+
-        ggtitle("Bruto atlyginimo pagal lyti histograma")+
+        scale_x_continuous(breaks = seq(min(dat1$Pajamos), max(dat1$Pajamos), by = 10000))
+ggplot(data, aes(x=GalimybeAtostogauti, y=Pajamos,color=as.factor(GalimybeAtostogauti))) +
+        labs(x="Galimybe atostogauti",y="Pajamos",color="GalimybeAtostogauti")+
+        geom_boxplot()+ggtitle("Galimybes atostogauti pagal pajamas staciakampe diagrama")+
+        scale_y_continuous(breaks = seq(0, max(data$Pajamos), by = 10000))
+ggplot(dat1, aes(x=Pajamos, group=GalimybeAtostogauti, color=GalimybeAtostogauti)) +
+        geom_histogram(fill="white",binwidth=10000, alpha=0.5, position="identity")+
+        labs(x="Pajamos",y="Dažnis",group="GalimybeAtostogauti",color="GalimybeAtostogauti")+
+        ggtitle("Galimybes atostogauti pagal pajamas histograma")+
         theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
-        scale_x_continuous(breaks = seq(min(dat1$bruto), max(dat1$bruto), by = 2500))
+        scale_x_continuous(breaks = seq(min(dat1$Pajamos), max(dat1$Pajamos), by = 10000))
+ggplot(data, aes(x=M_K, y=BustoIslaikymoIslaidos,color=as.factor(M_K))) +
+        labs(x="Vietove",y="Busto Islaikymo islaidos",color="Vietove")+
+        geom_boxplot()+
+        ggtitle("Busto islaikymo islaidu pagal vietove staciakampe diagrama")+
+        scale_y_continuous(breaks = seq(0, 10000, by = 100))
+ggplot(dat4, aes(x=as.numeric(BustoIslaikymoIslaidos), group=M_K, color=M_K)) +
+        geom_histogram(fill="white",binwidth=100, alpha=0.5, position="identity")+
+        labs(x="Vietove",y="Dažnis",group="M_K",color="M_K")+
+        ggtitle("Busto islaikymo islaidu pagal vietove histograma")+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        scale_x_continuous(breaks = seq(0, 2500, by = 100))
 
 
-###Stazas pagal lyti
-a <- ggplot(data, aes(x=lytis, y=bruto,color=as.factor(lytis))) +
-        labs(x="Lytis",y="Bruto atlyginimas",color="Atlyginimas")+
-        geom_boxplot()+ggtitle("Bruto atlyginimo pagal lytitačiakampė diagrama")+
-        scale_x_discrete(labels = c('Moterys','Vyrai'))+
-        scale_y_continuous(breaks = seq(0, max(data$bruto), by = 2000))
-a
+#Charakteristikos, penkiaskaite sistema
+summary(Data[,-1])
+#Papildomos sklaidos charakteristikos
+summarise_all(Data[,-1],list(StdNuok = sd, Dispersija = var))
+#Papildomos charakteristikos
+describe(Data[,-1],na.rm=T)
 
-ggplot(dat1, aes(x=as.numeric(stazas), group=lytis, color=lytis)) +
-        geom_histogram(fill="white",binwidth=1, alpha=0.5, position="identity")+
-        labs(x="Darbo stazas",y="Dažnis",group="Lytis",color="Lytis")+
-        ggtitle("Darbo stazo pagal lyti histograma")+
-        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))
+
+## 5-a uzduotis. 
+##Rinkmenoje „apklausa“ pasirinkite du kintamuosius ir atlikite t-testą
+        
 ### T testas
-t.test(data$bruto ~ data$sektorius)
+t.test(data$Pajamos ~ data$M_K)
 
 ### 6 uzduotis
-rez<-summarise(data,vid=mean(bruto), std=sd(bruto),disp=var(bruto)) 
-error <- qt(0.975,df=length(data$bruto)-1)*sd(data$bruto)/sqrt(length(data$bruto)) 
-left <- mean(data$bruto)-error
-right <- mean(data$bruto)+error
+##Rinkmenoje „apklausa“ pasirinkite intervalinį kintamajį bei suskaičiuokite vidurkio ir dispersijos
+##taškinius įverčius bei vidurkio pasikliautinąjį intervalą.
+rez<-summarise(data,vid=mean(Pajamos), std=sd(Pajamos),disp=var(Pajamos)) 
+error <- qt(0.975,df=length(data$Pajamos)-1)*sd(data$Pajamos)/sqrt(length(data$Pajamos)) 
+left <- mean(data$Pajamos)-error
+right <- mean(data$Pajamos)+error
 left
 right
 
-### 7 uzduotis.
-observations <- matrix(rnorm(50000, mean=rez$vid, sd=rez$std), 100, 500) # panaudojam apskaičiuotas charakteristikas
-means<- apply(observations,1,mean)
-variance<-apply(observations,1,var)
-deviation<-apply(observations,1,sd) # papildovai std nuokrypis
 
-hist(means)
+### 7 uzduotis.
+##6-oje dalyje gautus taškinius įverčius panaudokite atsitiktinių normaliųjų dydžių generavimui.
+##Porai (vidurkis, dispersija) sugeneruokite 100 normaliųjų atsitiktinių dydžių imčių
+##(imties dydis 500 stebėjimų). Apskaičiuokite gautų imčių taškinius vidurkio bei dispersijos įverčius.
+##Gautiems vidurkių taškiniams įverčiams išbrėžkite histogramą bei stačiakampę diagramą. 
+
+observations <- matrix(rnorm(50000, mean=rez$vid, sd=rez$std), 100, 500) 
+means<- apply(observations,1,mean)
+variance<-apply(observations,1,var)##Dispersija
+deviation<-apply(observations,1,sd)##Std. nuokrypis
+
+ggplot(as.data.frame(means),aes(x=means))+
+        geom_histogram(binwidth=300,color="white")+
+        scale_x_continuous(breaks=seq(30900,37280, 200),labels = seq(30900,37280, 200))+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        labs(x="vidurkiai",y="Dazniai")+
+        ggtitle("Vidurkiu iverciu histograma")
+
 ggplot(as.data.frame(means),aes(x="",y=means))+
         geom_boxplot()+
         ylab("Vidurkiai")+
-        ggtitle("Stačiakampė diagrama")
+        ggtitle("Staciakampe diagrama")
