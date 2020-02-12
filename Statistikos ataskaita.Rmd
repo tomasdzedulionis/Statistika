@@ -1,0 +1,595 @@
+---
+title: "Statistikos laboratorinio ataskaita. Eil.nr.: 31."
+author: "Tomas Dzedulionis, 1grupė, s1811407."
+date: "12/4/2019"
+output: pdf_document
+toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##1-a užduotis.
+
+**Parsisiųskite nurodytus duomenis (duomenų rinkmena toliau vadinama „apklausa“). Sudarykite duomenų rinkinį (parašyti R kodą), kuriame būtų nemažiau penkių stulpelių (kintamųjų). Bent vienas kintamasis turi būti kategorinis, bei bent vienas intervalinis.**
+
+```{r,warning=FALSE,message=FALSE}
+if(!require(tidyverse)) install.packages("tidyverse")
+require(tidyverse)
+if(!require(httr)) install.packages("httr")
+require(httr)
+if(!require(psych)) install.packages("psych")
+require(psych)
+url<-"https://drive.google.com/uc?export=download&id=12PNPliiWwR8L1u8s-Q02kvtzg5YyUjND"
+GET(url, write_disk(tf <- tempfile(fileext = ".csv")))
+data<- read.csv(tf, sep = ";", header=TRUE)
+data <- select(data, HH070, HS040, HS060, HS120, HY010, M_K)
+colnames(data) <- c("BustoIslaikymoIslaidos", "GalimybeAtostogauti", "GalimybeApmoketiIslaidas", "KaipVerciasi", "Pajamos", "M_K")
+levels(data$M_K) <- c(levels(data$M_K), "Miestas", "Kaimas") 
+data$M_K[data$M_K=="1"]  <- "Miestas"
+data$M_K[data$M_K=="2"]  <- "Kaimas"
+levels(data$GalimybeAtostogauti) <- c(levels(data$GalimybeAtostogauti), "Taip", "Ne")
+data$GalimybeAtostogauti[data$GalimybeAtostogauti=="1"] <- "Taip"
+data$GalimybeAtostogauti[data$GalimybeAtostogauti=="2"] <- "Ne"
+data$GalimybeAtostogauti <- factor(data$GalimybeAtostogauti)
+data$GalimybeApmoketiIslaidas <- factor (data$GalimybeApmoketiIslaidas)
+data$KaipVerciasi <- factor (data$KaipVerciasi)
+data$M_K <- factor (data$M_K)
+data<-na.omit(data)
+data$BustoIslaikymoIslaidos <- as.numeric(sub(",", ".", data$BustoIslaikymoIslaidos, fixed=T))
+data$Pajamos <- as.numeric(sub(",", ".", data$Pajamos, fixed=T))
+
+```
+
+*Kategoriniai kintamieji: Galimybė bent kartą per metus atostogauti (GalimybeAtostogauti), Galimybė apmokėti nenumatytas 700lt išlaidas (GalimybeApmoketiIslaidas), Kaip namų ūkis verčiasi(KaipVerciasi), Vietovė (M_K)
+*Intervaliniai kintamieji: Būsto išlaikymo išlaidos per mėnesį (BustoIslaikymoIslaidos), Namų ūkio pajamos per metus (Pajamos)
+
+
+##2-a užduotis.
+
+Parsisiųskite ne mažiau kaip 15-os paskutiniųjų metų nurodytų rodiklių duomenis iš pasirinktų šaltinių (Eurostat, Pasaulio banko, Tarptautinio valiutos fondo, Lietuvos statistikos departamento ir t.t.). Sudarykite duomenų rinkinį (parašyti R kodą), kuriame būtų laiko stulpelis (METAI) ir rodiklių stulpeliai (duomenų rinkmena toliau vadinama „macro“).
+```{r, warning=FALSE, message=FALSE}
+if(!require(psych)) install.packages("psych")
+require(psych)
+if(!require(eurostat)) install.packages("eurostat")
+require(eurostat)
+if(!require(tidyverse)) install.packages("tidyverse")
+require(tidyverse)
+if(!require(car)) install.packages("car")
+require(car)
+if(!require(reshape2)) install.packages("reshape2")
+require(reshape2)
+BVP_crrntmrktprice <- get_eurostat("tec00001", stringsAsFactors=FALSE) ## GDP at market prices
+BVP_crrntmrktprice <- filter(BVP_crrntmrktprice,
+                             geo=="FR",
+                             unit=="CP_MEUR") ## Market prices in EUR
+population_males<- get_eurostat("demo_pjan", stringsAsFactors=FALSE) ## Population on 1 January by age groups and sex - cities and greater cities
+population_males <- filter(population_males,
+                           time>="2007-01-01",
+                           age=="TOTAL",
+                           sex=="M",
+                           geo=="FR")
+unemployment <- get_eurostat("une_rt_a", stringsAsFactors = FALSE)
+unemployment <- filter(unemployment, 
+                       time>="2007-01-01",
+                       unit=="PC_POP", ##Percentage of total population
+                       sex=="M",
+                       geo=="FR",
+                       age=="Y25-74")
+mean_median_income <- get_eurostat("ilc_di13", stringsAsFactors= FALSE) ## Mean and median income before social transfers (pensions included in social transfers) by household type
+mean_median_income <- filter(mean_median_income, 
+                             time>="2007-01-01",
+                             geo=="FR",
+                             unit=="EUR",
+                             age=="Y16-64",
+                             sex=="T")
+
+
+Data <- right_join(unemployment, BVP_crrntmrktprice, by="time")
+Data <- right_join(Data, mean_median_income, by="time")
+Data <- right_join(Data, population_males, by="time")
+Data <- Data %>% rename(unemployment=values.x, bvp=values.y, unemploymentage=age.x, mean_median_income=values.x.x, population_males=values.y.y)
+Data <- select(Data, time, unemployment, bvp, indic_il, mean_median_income, population_males)
+Median <-Data %>% filter(indic_il=="MED_E") %>%
+        select(mean_median_income,time) %>% rename(medianincome=mean_median_income)
+Data <- right_join(Data, Median, by="time")
+Data <- select(Data, -mean_median_income, -indic_il)
+Data <- distinct(Data)
+Data$time <- format(as.Date(Data$time, format="%d/%m/%Y"),"%Y")
+Data$time <- as.numeric(Data$time)
+
+```
+
+##3-ia užduotis
+
+Rinkmenoje „apklausa“:
+
+a) Kategoriniams kintamiesiems sudarykite dažnių bei santykinių dažnių lenteles ir išbrėžkite stulpelių diagramą.
+
+Dažnių ir santykinių dažnių lentelės:
+```{r}
+table(data$GalimybeAtostogauti)
+prop.table(table(data$GalimybeAtostogauti))
+round(prop.table(table(data$GalimybeAtostogauti))*100, 2)
+
+table(data$GalimybeApmoketiIslaidas)
+prop.table(table(data$GalimybeApmoketiIslaidas))
+round(prop.table(table(data$GalimybeApmoketiIslaidas))*100, 2)
+
+table(data$KaipVerciasi)
+prop.table(table(data$KaipVerciasi))
+round(prop.table(table(data$KaipVerciasi))*100, 2)
+
+table(data$M_K)
+prop.table(table(data$M_K))
+round(prop.table(table(data$M_K))*100, 2)
+```
+
+\newpage 
+Stulpelių diagramos
+```{r, warning=FALSE, message=FALSE}
+ggplot(data, aes(GalimybeAtostogauti)) + 
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        scale_y_continuous(labels=scales::percent) +
+        labs(x="Galimybe karta per metus atostogauti",y="Procentai")+
+        ggtitle("Galimybe karta per metus atostogauti proc.")
+ggplot(data, aes(GalimybeApmoketiIslaidas)) + 
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        scale_y_continuous(labels=scales::percent) +
+        labs(x="Galimybe apmoketi islaidas",y="Procentai")+
+        ggtitle("Galimybe apmoketi nenumatytas 700lt islaidas proc. (1-Taip, 2-Ne)")
+ggplot(data, aes(KaipVerciasi)) + 
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        scale_y_continuous(labels=scales::percent) +
+        labs(x="Kaip namu ukis verciasi",y="Procentai")+
+        ggtitle("Kaip verciasi namu ukis? (1-labai sunkiai...6-labai lengvai)")
+ggplot(data, aes(M_K)) + 
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        scale_y_continuous(labels=scales::percent) +
+        labs(x="Vietove",y="Procentai")+
+        ggtitle("Vietoves pasiskirstymas proc.")
+```
+
+
+\newpage
+ b) Intervaliniams kintamiesiems apskaičiuokite padėties, sklaidos bei formos skaitines charakteristikas pagal kategorinio kintamojo(-ųjų) pjūvį(-ius).
+
+```{r, warning=FALSE, message=FALSE}
+dat<-select(data,BustoIslaikymoIslaidos,Pajamos)
+summary(dat)
+summarise_all(dat,list(StdNuok = sd, Dispersija = var, MAD = mad),na.rm=T)
+describe(dat,na.rm=T)
+dat1 <- select(data, GalimybeAtostogauti, BustoIslaikymoIslaidos, Pajamos)
+dat1 %>% group_by(GalimybeAtostogauti)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+dat2 <- select(data, GalimybeApmoketiIslaidas, BustoIslaikymoIslaidos, Pajamos)
+dat2 %>% group_by(GalimybeApmoketiIslaidas)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+dat3 <- select(data, KaipVerciasi, BustoIslaikymoIslaidos, Pajamos)
+dat3 %>% group_by(KaipVerciasi)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+dat4 <- select(data, M_K, BustoIslaikymoIslaidos, Pajamos)
+dat4 %>% group_by(M_K)%>% summarise_all(list(StdNuok = sd, Dispersija = var),na.rm=T)
+```
+
+\newpage
+c) Išbrėžkite pasirinktų rodiklių stačiakampę diagramą bei histogramą pagal kategorinio kintamojo(-ųjų) pjūvį(-ius). 
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(data, aes(x=M_K, y=Pajamos,color=as.factor(M_K))) +
+        labs(x="Vietove",y="Namu ukio pajamos",color="Pajamos")+
+        geom_boxplot()+ggtitle("Namu ukio pajamu pagal vietove staciakampe diagrama")+
+        scale_y_continuous(breaks = seq(0, max(data$Pajamos), by = 10000))
+```
+```{r, warning=FALSE, message=FALSE}
+ggplot(dat4, aes(x=Pajamos, group=M_K, color=M_K)) +
+        geom_histogram(fill="white",binwidth=10000, alpha=0.5, position="identity")+
+        labs(x="Namu ukio pajamos",y="Dažnis",group="M_K",color="M_K")+
+        ggtitle("Namu ukio pajamu pagal vietove histograma")+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        scale_x_continuous(breaks = seq(min(dat1$Pajamos), max(dat1$Pajamos), by = 10000))
+```
+```{r, warning=FALSE, message=FALSE}
+ggplot(data, aes(x=GalimybeAtostogauti, y=Pajamos,color=as.factor(GalimybeAtostogauti))) +
+        labs(x="Galimybe atostogauti",y="Pajamos",color="GalimybeAtostogauti")+
+        geom_boxplot()+ggtitle("Galimybes atostogauti pagal pajamas staciakampe diagrama")+
+        scale_y_continuous(breaks = seq(0, max(data$Pajamos), by = 10000))
+```
+```{r, warning=FALSE, message=FALSE}
+ggplot(dat1, aes(x=Pajamos, group=GalimybeAtostogauti, color=GalimybeAtostogauti)) +
+        geom_histogram(fill="white",binwidth=10000, alpha=0.5, position="identity")+
+        labs(x="Pajamos",y="Dažnis",group="GalimybeAtostogauti",color="GalimybeAtostogauti")+
+        ggtitle("Galimybes atostogauti pagal pajamas histograma")+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        scale_x_continuous(breaks = seq(min(dat1$Pajamos), max(dat1$Pajamos), by = 10000))
+```
+```{r, warning=FALSE, message=FALSE}
+ggplot(data, aes(x=M_K, y=BustoIslaikymoIslaidos,color=as.factor(M_K))) +
+        labs(x="Vietove",y="Busto Islaikymo islaidos",color="Vietove")+
+        geom_boxplot()+
+        ggtitle("Busto islaikymo islaidu pagal vietove staciakampe diagrama")+
+        scale_y_continuous(breaks = seq(0, 10000, by = 100))
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(dat4, aes(x=as.numeric(BustoIslaikymoIslaidos), group=M_K, color=M_K)) +
+        geom_histogram(fill="white",binwidth=100, alpha=0.5, position="identity")+
+        labs(x="Vietove",y="Dažnis",group="M_K",color="M_K")+
+        ggtitle("Busto islaikymo islaidu pagal vietove histograma")+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        scale_x_continuous(breaks = seq(0, 2500, by = 100))
+
+```
+
+
+
+
+
+
+##4-a užduotis
+
+Apibūdinkite „macro“ kintamuosius; apskaičiuokite padėties, sklaidos bei formos skaitines charakteristikas; pateikite gautų charakteristikų interpretaciją bei ekonominį pagrindimą; Išbrėžkite pasirinktų rodiklių linijos grafiką bei histogramą.
+
+**Kintamųjų apibūdinimas**
+Laboratoriniame darbe nagrinėjami šie kintamieji: Nedarbo lygis (unemployment), BVP (bvp), vyrų populiacija (population_males), pajamų mediana (medianincome).
+
+* 1-as kintamasis - Nedarbo lygis (unemployment). Nedirbančiu 25-74metų vyrų, kurie galėtų ir norėtų dirbti(bedarbių), tačiau neturi tokios galimybės, santykis su visais darbingais asmenimis, išreikštas procentais. Metiniai duomenys nuo 2007 iki 2018metų.
+* 2-as kintamasis - BVP (bvp). Bendrasis vidaus produktas - galutinė prekių ir paslaugų, sukurtų šalyje, rinkos vertė per tam tikrą laikotarpį. Laboratorinio darbo metu nagrinėtas BVP to meto kainomis, mln.Eur, metiniai duomenys 2007-2018m.
+* 3-as kintamasis - Vyrų populiacija. Metiniai vyrų populiacijos šalyje Sausio 1-ą dieną duomenys 2007-2018m.
+* 4-as kintamasis - ekvivalentinių neto pajamų mediana (medianincome). 16-64m. amžiaus asmenų neto pajamų, prieš socialinius transferus, mediana. Metinia duomenys 2007-2018m.
+
+
+```{r, message=FALSE, warning=FALSE}
+#Charakteristikos, penkiaskaite sistema
+summary(Data[,-1])
+#Papildomos sklaidos charakteristikos
+summarise_all(Data[,-1],list(StdNuok = sd, Dispersija = var))
+#Papildomos charakteristikos
+describe(Data[,-1],na.rm=T)
+```
+
+**BVP**
+Nagrinėjamu laikotarpiu minimalus BVP buvo 1936422mln.eur. vadinasi, tada šalyje buvo sukurta baigtinių prekių ir paslaugų už mažiausią vertę. Tuo tarpu maksimalus BVP buvo 2353090mln.eur.
+Kadangi nagrinėjamu laikotarpiu nepasitaikė didelių išskirčių, BVP vidurkis (2113358mln.eur) ir mediana (2102996mln.eur) skiriais nežymiai.
+1-as kvartilis (1994562) nurodo, kad 25%(3metus) šalies BVP buvo mažesnis, 3-ias kvartilis (2207356) nurodo, kad 75% reikšmių (9metus) šalies BVP buvo mažesnis už šį skaičių.
+BVP sklaidą apie vidurkį galime matyti iš dispersijos (18794892669), tačiau kadangi šis dydis matuojamas kvadratu, analizei tinkamesnis standartinio nuokrypio (137094,47) matavimas.
+Asimetrijos koeficientas (0.26) rodo, kad histograma turi teigiamą asimetriją, taigi BVP vidurkio reikšmė turėtų būti didesnė nei mediana. Eksceso koeficientas (-1.36) rodo, jog duomenų sklaida apie vidurkį yra mažesnė nei normaliosios kreivės atveju.
+
+
+**Nedarbo lygis**
+Nagrinėjamu laikotarpiu mažiausias nedarbo lygis buvo 3,8%, tuo tarpu didžiausias - 6.6%.
+Kadangi nagrinėjamu laikotarpiu nepasitaikė didelių išskirčių, vidurkis (5.458%) ir mediana(5.55%) skiriasi nežymiai.
+1-as kvartilis (5,075%) nurodo, jog 25%(3metus) nedarbo lygis šalyje buvo mažesnis už šį skaičių, tuo tarpu 3-ias kvartilis(6,2%) leidžia suprasti, kad 75% reikšmių (9metus) šalies BVP buvo mažesnis už šį skaičių.
+Nedarbo lygio sklaidą apie vidurkį galime matyti iš dispersijos (0,724), tačiau kadangi šis dydis matuojamas kvadratu, analizei tinkamesnis standartinio nuokrypio (0,851%) matavimas.
+Asimetrijos koeficientas (-0,42) rodo, kad histograma turi neigiamą asimetriją, todėl nedarbo lygio vidurkio reikšmė turėtų būti mažesnė už medianą. Eksceso koeficientas (-1.01) rodo, jog duomenų sklaida apie vidurkį yra mažesnė nei normaliosios kreivės atveju.
+
+**Vyrų populiacija**
+Nagrinėjamu laikotarpiu mažiausia vyrų populiacija buvo 30803233, tuo tarpu didžiausia - 32370566.
+Kadangi nagrinėjamu laikotarpiu nepasitaikė didelių išskirčių, vidurkis (31685872.33) ir mediana(31689024) skiriasi nežymiai.
+1-as kvartilis (31263318) nurodo, jog 25%(3metus) šalies vyrų populiacija buvo mažesnė, o 3-ias kvartilis (32192540)leidžia suprasti, kad 75% reikšmių (9metus) šalies vyrų populiacija buvo mažesnė už šį skaičių.
+Vyrų populiacijos sklaidą apie vidurkį galime matyti iš dispersijos(302734945050), tačiau kadangi šis dydis matuojamas kvadratu, analizei tinkamesnis standartinio nuokrypio (550213.54) matavimas.
+Asimetrijos koeficientas (-0.17) rodo, kad histograma turi neigiamą asimetriją, todėl nedarbo lygio vidurkio reikšmė turėtų būti mažesnė už medianą. Eksceso koeficientas (-1.62) rodo, jog duomenų sklaida apie vidurkį yra mažesnė nei normaliosios kreivės atveju.
+
+**Pajamų mediana**
+Nagrinėjamu laikotarpiu mažiausia pajamų mediana buvo 13155eur., tuo tarpu didžiausia - 18371eur. 
+Kadangi nagrinėjamu laikotarpiu nepasitaikė dideliu išskirčių, vidurkis(16785) ir mediana(17174) skiriasi nežymiai.
+1-as kvartilis (16234) nurodo, jog jog 25%(3metus) šalies pajamų mediana buvo mažesnė, o 3-ias kvartilis(17174) leidžia suprasti, kad 75% reikšmių (9metus) šalies pajamų mediana buvo mažesnė už šį skaičių.
+Pajamų medianos sklaidą apie vidurkį galime matyti iš dispersijos(1995749), tačiau kadangi šis dydis matuojamas kvadratu, analizei tinkamesnis standartinio nuokrypio (1413) matavimas.
+Asimetrijos koeficientas(-1.21) rodo, kad histograma turi neigiamą asimetriją, todėl pajamų medianos vidurkio reikšmė bus mažesnė už medianos reikšmę. Eksceso koeficientas (0.89) rodo, jog duomenų sklaida apie vidurkį yra didesnė nei normaliosios kreivės atveju.
+
+
+**Grafikai ir histogramos**
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(Data, aes(x=time, y=bvp)) +
+        geom_line() +
+        geom_point()+
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        ggtitle("BVP 2007-2018m.")+
+        scale_x_continuous(breaks = seq(min(Data$time), max(Data$time), by = 1))+
+        labs(x="Metai", y="BVP, mln.eur.", subtitle = "Duomenu saltinis:Eurostat[tec00001]")
+```
+
+```{r, warning=FALSE,message=FALSE}
+ggplot(Data, aes(x = time)) + 
+        geom_line(aes(y = bvp, colour = "BVP")) + 
+        geom_line(aes(y = unemployment*100000, colour = "Vyru nedarbas")) + 
+        scale_y_continuous(sec.axis = sec_axis(~.*0.00001, name = "Vyru nedarbas [%]")) + 
+        labs(y = "BVP [mln. eur.]", x = "Metai",
+             colour = "Parametrai") + 
+        scale_x_continuous(breaks = seq(min(Data$time), max(Data$time), by = 1))+
+        theme(legend.position = c(0.1, 0.9),
+              axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        ggtitle("BVP ir vyru nedarbo lygis 2007-2018m.")
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(Data, aes(x = time)) + 
+        geom_line(aes(y = bvp, colour = "BVP")) + 
+        geom_line(aes(y = medianincome*100, colour = "Pajamu mediana")) + 
+        scale_y_continuous(sec.axis = sec_axis(~.*0.01, name = "Pajamu mediana")) + 
+        labs(y = "BVP [mln. eur.]", x = "Metai",
+             colour = "Parametrai", subtitle="Saltinis:Eurostat[ilc_di13]") + 
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        theme(legend.position="bottom")+
+        scale_x_continuous(breaks = seq(min(Data$time), max(Data$time), by = 1))+
+        ggtitle("BVP ir pajamu medianos kitimas 2007-2018m.")
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(Data, aes(x = time)) + 
+        geom_line(aes(y = medianincome, colour = "Pajamu mediana")) + 
+        geom_line(aes(y = unemployment*1000, colour = "Nedarbo lygis")) + 
+        scale_y_continuous(sec.axis = sec_axis(~.*0.001, name = "Nedarbo lygis")) + 
+        labs(y = "Pajamu mediana", x = "Metai",
+             colour = "Parametrai", subtitle="Saltinis:Eurostat") + 
+        theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+        theme(legend.position="bottom")+
+        scale_x_continuous(breaks = seq(min(Data$time), max(Data$time), by = 1))+
+        ggtitle("Pajamu medianos ir vyru nedarbo lygio kitimas 2007-2018m.")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+hist(Data$bvp,
+     main="BVP histograma",
+     xlab="BVP",
+     ylab="Daznis")
+```
+
+```{r, warning=FALSE, message=FALSE}
+hist(Data$medianincome,
+     main="Pajamu medianos histograma",
+     xlab="Pajamu mediana",
+     ylab="Daznis")
+```
+
+```{r, warning=FALSE, message=FALSE}
+hist(Data$unemployment,
+     main="Nedarbo lygio histograma",
+     xlab="Nedarbo lygis",
+     ylab="Daznis")
+```
+
+```{r, warning=FALSE, message=FALSE}
+hist(Data$population_males,
+     main="Vyru populiacijos histograma",
+     xlab="Vyru populiacija",
+     ylab="Daznis")
+```
+
+##5-a užduotis. 
+Rinkmenoje „apklausa“ pasirinkite du kintamuosius ir atlikite t-testą. (Nepamirškite parašyti tyrimo hipotezę, statistinę hipotezę bei tyrimo išvadą).
+
+```{r, warning=FALSE, message=FALSE}
+t.test(data$Pajamos ~ data$M_K)
+```
+Tyrimo hipotezė: Mieste gyvenančių namų ūkių pajamos yra didesnės nei kaime gyvenančių
+Statistinė hipotezė: 
+H0: Namų ūkio pajamų vidurkiai tiek mieste, tiek kaime yra vienodi.
+H1: Namų ūkio pajamų vidurkiai tiek mieste, tiek kaime skiriasi.
+$$H0: \mu Kaimo = \mu Miesto$$
+$$H1: \mu Kaimo \neq \mu Miesto$$
+Išvada: pritaikę stjudento testą gavome, kad p<2.2e-16, p<0.05, todėl atmetame H0 - vidurkiai reikšmingai statistiškai skiriasi su 5% reikšmingumo lygmeniu. Priimame H1 hipotezę.
+Pajamų gaunamų kaimo vietovėje vidurkis 27933.97, mieste gaunamų pajamų vidurkis 36543.24.
+Žmonės, gyvenantys mieste vidutiniškai uždirba daugiau, negu tie, kurie gyvena kaimo vietovėse.
+
+## 6-a užduotis
+Rinkmenoje „apklausa“ pasirinkite intervalinį kintamajį bei suskaičiuokite vidurkio ir dispersijos
+taškinius įverčius bei vidurkio pasikliautinąjį intervalą.
+
+```{r, warning=FALSE,message=FALSE}
+rez<-summarise(data,vid=mean(Pajamos), std=sd(Pajamos),disp=var(Pajamos)) 
+error <- qt(0.975,df=length(data$Pajamos)-1)*sd(data$Pajamos)/sqrt(length(data$Pajamos)) 
+left <- mean(data$Pajamos)-error
+right <- mean(data$Pajamos)+error
+left
+right
+```
+
+## 7-a užduotis
+6-oje dalyje gautus taškinius įverčius panaudokite atsitiktinių normaliųjų dydžių generavimui. Porai (vidurkis, dispersija) sugeneruokite 100 normaliųjų atsitiktinių dydžių imčių (imties dydis 500 stebėjimų). Apskaičiuokite gautų imčių taškinius vidurkio bei dispersijos įverčius. Gautiems vidurkių taškiniams įverčiams išbrėžkite histogramą bei stačiakampę diagramą. Ką galite pasakyti apie įverčių stabilumą?
+
+```{r, warning=FALSE, message=FALSE}
+observations <- matrix(rnorm(50000, mean=rez$vid, sd=rez$std), 100, 500) 
+means<- apply(observations,1,mean)
+variance<-apply(observations,1,var)##Dispersija
+deviation<-apply(observations,1,sd)##Std. nuokrypis
+```
+```{r, warning=FALSE, message=FALSE}
+ggplot(as.data.frame(means),aes(x=means))+
+  geom_histogram(binwidth=300,color="white")+
+  scale_x_continuous(breaks=seq(30900,37280, 200),labels = seq(30900,37280, 200))+
+  theme(axis.text.x = element_text(face="bold",  size=8, angle=90))+
+  labs(x="vidurkiai",y="Dazniai")+
+  ggtitle("Vidurkiu iverciu histograma")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(as.data.frame(means),aes(x="",y=means))+
+geom_boxplot()+
+  ylab("Vidurkiai")+
+  ggtitle("Staciakampe diagrama")
+```
+
+Įverčiai nėra stabilūs, kadangi histograma rodo, jog didesnė dalis generuotų vidurkio taškinių įverčių nepatenka į pasikliautinąjį intervalą, o stačiakampėje diagramoje taip pat pastebima esant išskirčių.
+
+##8 užduotis
+
+Rinkmenos „macro“ kintamiesiems išskirkite tiesinius trendus. Pavaizduokite duomenų ir trendų grafikus. Apibūdinkite laiko eilučių tendencijas.
+
+```{r, warning=FALSE,message=FALSE}
+cols.num <- c("unemployment","bvp","population_males",
+"medianincome")
+DF<-Data
+DF[cols.num] <- sapply(Data[cols.num],as.numeric)
+DF$time <- as.integer(DF$time)
+
+trnd<-lm(bvp~time, data=DF)
+summary(trnd)
+trnd2<-lm(population_males~time, data=DF)
+summary(trnd2)
+trnd3<-lm(medianincome~time, data=DF)
+summary(trnd3)
+trnd4<-lm(unemployment~time, data=DF)
+summary(trnd4)
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplotRegression <- function(fit,DF){
+        
+        ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+                geom_line() +
+                geom_point(size=3)+
+                scale_x_continuous(breaks=DF$time,labels=DF$time)+
+                stat_smooth(method = "lm", col = "red") +
+                labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                                   "Intercept =",signif(fit$coef[[1]],5 ),
+                                   " Slope =",signif(fit$coef[[2]], 5),
+                                   " P =",signif(summary(fit)$coef[2,4], 5)))+
+                theme(axis.text.x = element_text(face="bold",  size=8, angle=45))
+}
+
+ggplotRegression(lm(bvp ~ time, data = DF),DF)
+ggplotRegression(lm(population_males~time, data=DF),DF)
+ggplotRegression(lm(medianincome~time, data=DF),DF)
+ggplotRegression(lm(unemployment~time, data=DF),DF)
+```
+
+Sudarytos keturi tiesiniai trendai: BVP, vyrų populiacijos, pajamų medianos ir nedarbo lygio. 
+Visuose trenduose pastebima augimo tendencija. Didžiausias determinacijos koeficientas(0.9808) matomas vyrų populiacijos augimo trende, todėl galime teigti, jog šis modelis geriausias. Mažiausias determinacijos koeficientas (0.49128) bedarbystės trende, todėl šis modelis, nors ir tinkamas (determinacijos koeficientas > 0.2), tačiau blogiausias iš visų pateiktų.
+
+##9 užduotis
+Pasirinkite kelis arba visus „macro“ duomenų kintamuosius ir sudarykite tiesinę regresiją ir atlikite prognozę. Interpretuokite gautus rezultatus
+
+Tiesinė regresija:
+1. priklausomas kintamasis Pajamų mediana, regresorius - BVP. 
+2. priklausomas kintamasis BVP, regresorius - vyrų populiacija.
+```{r, warning=FALSE, message=FALSE}
+cor(DF[,-1])
+cr <- corr.test(DF[,-1], ci=TRUE)
+cr
+cr$r
+cr$p
+cr$ci.adj
+
+regr2<-lm(bvp~population_males, data=DF)
+summary(regr2)
+
+regr3<-lm(medianincome~bvp, data=DF)
+summary(regr3)
+```
+
+1.Tiesinė regresija.
+```{r, warning=FALSE, message=FALSE}
+ggplotRegression(regr3,DF)
+```
+
+2.Tiesinė regresija
+```{r, warning=FALSE, message=FALSE}
+ggplotRegression(regr2,DF)
+```
+Abiejų tiesinių regresijų determinacijos koeficientas didesnis už 0.2, todėl modeliai tinkami. Galime matyiti, jog tiek BVP augimas teigiamai keičia pajamų mediana, tiek vyrų populiacija - BVP dydį.
+
+
+
+Prognozė: Pajamų mediana nuo BVP.
+```{r, warning=FALSE,message=FALSE}
+new.time <- data.frame(time = c(Data$time, 2018:2020))
+new.bvp <- data.frame(bvp=predict(trnd, new.time, se.fit=TRUE)$fit)
+prognoze1 <- predict(regr3, new.bvp, se.fit = TRUE, 
+                     interval = "confidence")
+prognoze <- predict(regr3, new.bvp, se.fit = TRUE, 
+                    interval = "prediction")
+
+g.df <- data.frame(Metai = new.time, 
+                   medianincome = c(DF$medianincome, rep(NA, 3)),
+                   fitMediannincome = prognoze$fit[,1],
+                   opMedianincome = prognoze$fit[,3],
+                   pesMedianincome = prognoze$fit[,2])
+mg.df <- melt(g.df, id="time")
+
+
+ggplot(mg.df, aes(time, value, color=variable, shape=variable,
+                  linetype=variable)) +
+        geom_line()+
+        geom_point()+
+        labs(x="Metai", y="Pajamu mediana", title="Pajamu mediana ir pajamu medianos kitimo prognoze")+
+        theme(legend.position="bottom")+
+        scale_colour_manual(name = "Pajamu mediana ir prognoze",
+                            labels = c("Pajamu mediana", "Taskine prognoze", "Optimistine prognoze", 
+                                         "Pesimistine prognoze"),
+                            values = 1:4) +   
+        scale_shape_manual(name = "Pajamu mediana ir prognoze",
+                           labels = c("Pajamu mediana", "Taskine prognoze", "Optimistine prognoze", 
+                                         "Pesimistine prognoze"),
+                           values = 1:4) +
+        scale_linetype_manual(name = "Pajamu mediana ir prognoze",
+                              labels = c("Pajamu mediana", "Taskine prognoze", "Optimistine prognoze", 
+                                         "Pesimistine prognoze"),
+                              values = 1:4)
+
+g1.dt <- data.frame(Metai = new.time, 
+                    Medianincome = c(DF$medianincome, rep(NA, 3)),
+                    fitMedianincome = prognoze1$fit[,1],
+                    opMedianincome = prognoze1$fit[,3],
+                    pesMedianincome = prognoze1$fit[,2])
+
+ggplot(g1.dt, aes(time, fitMedianincome)) +
+        geom_line(color="blue") +
+        geom_line(aes(time, opMedianincome), color=2) +
+        geom_line(aes(time, pesMedianincome), color=2) +
+        geom_line(aes(time, Medianincome))+
+        labs(x="Metai", y="Pajamu mediana", title="Pajamu mediana ir pajamu medianos prognoze su \npasikliautinais intervalais")
+```
+
+Prognozė: BVP nuo vyrų populiacijos.
+```{r, warning=FALSE,message=FALSE}
+
+new.populationmales <- data.frame(population_males=predict(trnd2, new.time, se.fit=TRUE)$fit)
+prognoze2 <- predict(regr2, new.populationmales, se.fit = TRUE, 
+                     interval = "confidence")
+prognoze22 <- predict(regr2, new.populationmales, se.fit = TRUE, 
+                    interval = "prediction")
+
+g.df2 <- data.frame(Metai = new.time, 
+                   bvp = c(DF$bvp, rep(NA, 3)),
+                   fitbvp = prognoze2$fit[,1],
+                   opbvp = prognoze2$fit[,3],
+                   pesbvp = prognoze2$fit[,2])
+mg.df2 <- melt(g.df, id="time")
+
+
+ggplot(mg.df2, aes(time, value, color=variable, shape=variable,
+                  linetype=variable)) +
+        geom_line()+
+        geom_point()+
+        labs(x="Metai", y="BVP", title="BVP ir BVP kitimo prognoze")+
+        theme(legend.position="bottom")+
+        scale_colour_manual(name = "BVP ir prognoze",
+                            labels = c("BVP", "Taskine prognoze", "Optimistinė prognozė", 
+                                       "Pesimistinė prognoze"),
+                            values = 1:4) +   
+        scale_shape_manual(name = "BVP ir prognoze",
+                            labels = c("BVP", "Taskine prognoze", "Optimistinė prognozė", 
+                                       "Pesimistinė prognoze"),
+                           values = 1:4) +
+        scale_linetype_manual(name = "BVP ir prognoze",
+                            labels = c("BVP", "Taskine prognoze", "Optimistinė prognozė", 
+                                       "Pesimistinė prognoze"),
+                              values = 1:4)
+
+g1.dt2 <- data.frame(Metai = new.time, 
+                    bvp = c(DF$bvp, rep(NA, 3)),
+                    fitbvp = prognoze22$fit[,1],
+                    opbvp = prognoze22$fit[,3],
+                    pesbvp = prognoze22$fit[,2])
+
+ggplot(g1.dt2, aes(time, fitbvp)) +
+        geom_line(color="blue") +
+        geom_line(aes(time, opbvp), color=2) +
+        geom_line(aes(time, pesbvp), color=2) +
+        geom_line(aes(time, bvp))+
+        labs(x="Metai", y="BVP", title="BVP ir BVP prognoze su pasikliautinais intervalais")
+```
+Pirmoje prognozėje buvo nagrinėjamas pajamų medianos augimas nuo BVP. Šių dydžių koreliacija lygi 0.8259947, o iš pateiktos prognozės matome, jog ateityje, augant BVP, augs ir pajamų mediana.
+Antroji prognozė - BVP augimas nuo vyrų populiacijos. Šių dydžių koreliacija 0.9567976, o iš pateiktos prognozės matome, jog ateityje, augant vyrų populiacijai, augs ir BVP.
